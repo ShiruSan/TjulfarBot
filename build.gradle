@@ -1,0 +1,42 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:6.1.0'
+    }
+}
+
+plugins {
+    id 'com.github.johnrengelman.shadow' version '6.1.0'
+    id 'java'
+}
+
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'java'
+
+group 'de.Shiru'
+version '1.0-SNAPSHOT'
+targetCompatibility = '1.8'
+sourceCompatibility = '1.8'
+
+repositories {
+    mavenCentral()
+    maven {
+        name 'm2-dv8tion'
+        url 'https://m2.dv8tion.net/releases'
+    }
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+    compile("net.dv8tion:JDA:4.2.1_253")
+    compile 'com.google.code.gson:gson:2.8.6'
+    compile group: 'mysql', name: 'mysql-connector-java', version: '8.0.23'
+    compile group:'org.xerial', name:'sqlite-jdbc', version:'3.8.11.2'
+}
+
+test {
+    useJUnitPlatform()
+}

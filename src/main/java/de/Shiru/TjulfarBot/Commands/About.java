@@ -28,7 +28,7 @@ public class About extends Command {
         builder1.append("Au\u00DFerdem findest du hier eine Auflistung aller Commands.");
         builder.setDescription(builder1.toString());
         builder.setColor(Color.GREEN);
-        builder.setFooter("Du möchtest wissen wie ich funktioniere ? https://github.com/ShiruSan/TjulfarBot");
+        builder.setFooter("Du m\u00F6chtest wissen wie ich funktioniere ? https://github.com/ShiruSan/TjulfarBot");
         List<String> commands = new ArrayList<>();
         for(Command command : Listener.manager.commands) commands.add("  \u2022  " + command.name);
         builder.addField("Alle Commands", String.join("\n", commands), false);

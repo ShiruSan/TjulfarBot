@@ -9,6 +9,7 @@ import net.dv8tion.jda.api.entities.TextChannel;
 
 import java.awt.*;
 import java.io.*;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -21,33 +22,32 @@ public class LevelManager {
 
     public void init() {
         try {
-            PreparedStatement preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("CREATE TABLE IF NOT EXISTS `Levels` (" +
+            try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("CREATE TABLE IF NOT EXISTS `Levels` (" +
                     "userid bigint not null," +
                     "level integer not null," +
                     "messages integer not null," +
-                    "Primary Key(userid))");
-            preparedStatement.executeUpdate();
-            preparedStatement.close();
-            preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("select * from `LevelConfig`");
-            ResultSet set = preparedStatement.executeQuery();
-            while(set.next()) {
-                if(set.getString(2).equals("channel")) {
-                    levelChannels.add(set.getLong(1));
-                } else blackListedMembers.add(set.getLong(1));
+                    "Primary Key(userid))")) {
+                preparedStatement.executeUpdate();
             }
-            set.close();
+            try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("select * from `LevelConfig`")) {
+                ResultSet set = preparedStatement.executeQuery();
+                while(set.next()) {
+                    if(set.getString(2).equals("channel")) {
+                        levelChannels.add(set.getLong(1));
+                    } else blackListedMembers.add(set.getLong(1));
+                }
+                set.close();
+            }
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }
     }
 
     public void addLevelChannel(long id) {
-        try {
-            PreparedStatement preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("insert into `LevelConfig` values (?, ?)");
+        try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("insert into `LevelConfig` values (?, ?)");) {
             preparedStatement.setLong(1, id);
             preparedStatement.setString(2, "channel");
             preparedStatement.executeUpdate();
-            preparedStatement.close();
             levelChannels.add(id);
         } catch (SQLException throwables) {
             throwables.printStackTrace();
@@ -55,11 +55,9 @@ public class LevelManager {
     }
 
     public void removeLevelChannel(long id) {
-        try {
-            PreparedStatement preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("delete from `LevelConfig` where id = ?");
+        try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("delete from `LevelConfig` where id = ?")) {
             preparedStatement.setLong(1, id);
             preparedStatement.executeUpdate();
-            preparedStatement.close();
             levelChannels.remove(id);
         } catch (SQLException throwables) {
             throwables.printStackTrace();
@@ -67,12 +65,10 @@ public class LevelManager {
     }
 
     public void addBlacklist(long id) {
-        try {
-            PreparedStatement preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("insert into `LevelConfig` values (?, ?)");
+        try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("insert into `LevelConfig` values (?, ?)")) {
             preparedStatement.setLong(1, id);
             preparedStatement.setString(2, "blacklist");
             preparedStatement.executeUpdate();
-            preparedStatement.close();
             blackListedMembers.add(id);
         } catch (SQLException throwables) {
             throwables.printStackTrace();
@@ -80,11 +76,9 @@ public class LevelManager {
     }
 
     public void removeBlacklist(long id) {
-        try {
-            PreparedStatement preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("delete from `LevelConfig` where id = ?");
+        try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("delete from `LevelConfig` where id = ?")) {
             preparedStatement.setLong(1, id);
             preparedStatement.executeUpdate();
-            preparedStatement.close();
             blackListedMembers.remove(id);
         } catch (SQLException throwables) {
             throwables.printStackTrace();
@@ -92,17 +86,16 @@ public class LevelManager {
     }
 
     public boolean existsProfile(long id) {
-        try {
-            PreparedStatement preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("select * from Levels where userid = ?");
+        boolean exists = false;
+        try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("select * from Levels where userid = ?")) {
             preparedStatement.setLong(1, id);
             ResultSet set = preparedStatement.executeQuery();
-            boolean exists = set.next();
+            exists = set.next();
             set.close();
-            preparedStatement.close();
-            return exists;
         } catch (SQLException e) {
-            return false;
+            e.printStackTrace();
         }
+        return exists;
     }
 
     public Profile createProfile(long id) {
@@ -110,13 +103,11 @@ public class LevelManager {
         profile.userid = id;
         profile.level = 0;
         profile.messages = 0;
-        try {
-            PreparedStatement preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("insert into Levels values (?, ?, ?)");
+        try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("insert into Levels values (?, ?, ?)")) {
             preparedStatement.setLong(1, id);
             preparedStatement.setInt(2, 0);
             preparedStatement.setInt(3, 0);
             preparedStatement.executeUpdate();
-            preparedStatement.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -124,22 +115,22 @@ public class LevelManager {
     }
 
     public Profile getProfileByID(long id){
-        try {
-            PreparedStatement preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("select * from Levels where userid = ?");
+        Profile profile = new Profile();
+        profile.userid = id;
+        profile.level = 0;
+        profile.messages = 0;
+        try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("select * from Levels where userid = ?")) {
             preparedStatement.setLong(1, id);
             ResultSet set = preparedStatement.executeQuery();
             set.next();
-            Profile profile = new Profile();
-            profile.userid = id;
             profile.level = set.getInt(2);
             profile.messages = set.getInt(3);
             set.close();
-            preparedStatement.close();
             return profile;
         } catch (SQLException e) {
             e.printStackTrace();
-            return null;
         }
+        return profile;
     }
 
     public MessageEmbed createEmbedProfile(LevelManager.Profile profile, Member member) {
@@ -193,13 +184,11 @@ public class LevelManager {
 
         public void updateEntry() {
             updateState();
-            try {
-                PreparedStatement preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("update Levels set level = ?, messages = ? where userid = ?");
+            try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("update Levels set level = ?, messages = ? where userid = ?")) {
                 preparedStatement.setInt(1, level);
                 preparedStatement.setInt(2, messages);
                 preparedStatement.setLong(3, userid);
                 preparedStatement.executeUpdate();
-                preparedStatement.close();
             } catch (SQLException e) {
                 e.printStackTrace();
             }

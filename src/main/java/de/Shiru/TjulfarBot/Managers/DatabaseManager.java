@@ -2,6 +2,8 @@ package de.Shiru.TjulfarBot.Managers;
 
 import com.google.gson.Gson;
 import com.mysql.cj.jdbc.MysqlDataSource;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import de.Shiru.TjulfarBot.BotMain;
 import de.Shiru.TjulfarBot.Commands.Mute;
 import net.dv8tion.jda.api.JDA;
@@ -14,8 +16,6 @@ import javax.sql.DataSource;
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
-import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
@@ -40,6 +40,7 @@ public class DatabaseManager {
                 this.dataSource = dataSource; 
             } else {
                 MysqlDataSource mysqlDataSource = new MysqlDataSource();
+                HikariConfig config = new HikariConfig();
                 String ip = BotMain.getInstance().getSettings().mySQLConfig.ip;
                 int port = BotMain.getInstance().getSettings().mySQLConfig.port;
                 String username = BotMain.getInstance().getSettings().mySQLConfig.username;
@@ -48,31 +49,32 @@ public class DatabaseManager {
                 mysqlDataSource.setUrl("jdbc:mysql://" + ip +  ":" + port + "/" + database);
                 mysqlDataSource.setUser(username);
                 mysqlDataSource.setPassword(password);
-                this.dataSource = mysqlDataSource;
+                config.setDataSource(mysqlDataSource);
+                this.dataSource = new HikariDataSource(config);
             }
-            PreparedStatement preparedStatement = dataSource.getConnection().prepareStatement("CREATE TABLE IF NOT EXISTS  `TempBans` (" +
+            try(Connection connection = dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("CREATE TABLE IF NOT EXISTS  `TempBans` (" +
                     "id integer not null," +
                     "userid bigint not null," +
                     "passing bigint not null," +
                     "passed boolean not null," +
-                    "Primary Key(id));");
-            preparedStatement.executeUpdate();
-            preparedStatement.close();
-            preparedStatement = dataSource.getConnection().prepareStatement("select * from TempBans");
-            ResultSet set = preparedStatement.executeQuery();
-            while (set.next()) tempBanId = set.getInt(1) + 1;
-            set.close();
-            preparedStatement.close();
-            preparedStatement = dataSource.getConnection().prepareStatement("select * from TempBans where passed = ?");
-            preparedStatement.setBoolean(1, false);
-            set = preparedStatement.executeQuery();
-            while (set.next()) {
-                TempBan tempBan = new TempBan(set.getInt(1), set.getLong(2), set.getLong(3));
-                tempBans.add(tempBan);
+                    "Primary Key(id));");) {
+                preparedStatement.executeUpdate();
             }
-            set.close();
-            preparedStatement.close();
-            preparedStatement = dataSource.getConnection().prepareStatement("CREATE TABLE IF NOT EXISTS  `Mutes` (" +
+            try(Connection connection = dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("select * from TempBans")) {
+                ResultSet set = preparedStatement.executeQuery();
+                while (set.next()) tempBanId = set.getInt(1) + 1;
+                set.close();
+            }
+            try(Connection connection = dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("select * from TempBans where passed = ?");) {
+                preparedStatement.setBoolean(1, false);
+                ResultSet set = preparedStatement.executeQuery();
+                while (set.next()) {
+                    TempBan tempBan = new TempBan(set.getInt(1), set.getLong(2), set.getLong(3));
+                    tempBans.add(tempBan);
+                }
+                set.close();
+            }
+            try(Connection connection = dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("CREATE TABLE IF NOT EXISTS  `Mutes` (" +
                     "`id` integer not null," +
                     "`userid` bigint not null," +
                     "`passing` bigint null," +
@@ -80,42 +82,36 @@ public class DatabaseManager {
                     "`type` integer not null," +
                     "`reason` varchar(1000) null," +
                     "`mutedChannels` varchar(10000) not null," +
-                    "Primary Key(id));");
-            preparedStatement.executeUpdate();
-            preparedStatement.close();
-            preparedStatement = dataSource.getConnection().prepareStatement("CREATE TABLE IF NOT EXISTS  `LevelConfig` (" +
-                    "`id` bigint not null," +
-                    "`type` varchar(9) not null," +
-                    "Primary Key(id));");
-            preparedStatement.executeUpdate();
-            preparedStatement.close();
-            preparedStatement = dataSource.getConnection().prepareStatement("CREATE TABLE IF NOT EXISTS  `Youtube` (" +
+                    "Primary Key(id));")) {
+                preparedStatement.executeUpdate();
+            }
+            try(Connection connection = dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("CREATE TABLE IF NOT EXISTS  `Youtube` (" +
                     "`channelid` varchar(100) not null," +
                     "`channelname` varchar(100) not null," +
-                    "Primary Key(channelid));");
-            preparedStatement.executeUpdate();
-            preparedStatement.close();
-            preparedStatement = dataSource.getConnection().prepareStatement("select * from Mutes where passed = ?");
-            preparedStatement.setBoolean(1, false);
-            set = preparedStatement.executeQuery();
-            JDA jda = BotMain.getInstance().getJda();
-            Gson gson = new Gson();
-            while (set.next()) {
-                Mute.MutedMember mutedMember = new Mute.MutedMember();
-                mutedMember.sqid = set.getInt(1);
-                mutedMember.member = jda.getGuilds().get(0).getMemberById(set.getLong(2));
-                mutedMember.expires = set.getLong(3);
-                mutedMember.muteType = Mute.MutedMember.MuteType.getMuteTypeByID(set.getInt(5));
-                mutedMember.reason = set.getString(6);
-                List<Long> rawTextChannels = gson.fromJson(set.getString(7), ArrayList.class);
-                List<TextChannel> currentMuted = new ArrayList<>();
-                for(long id : rawTextChannels) currentMuted.add(mutedMember.member.getGuild().getTextChannelById(id));
-                mutedMember.currentMuted = currentMuted;
-                Mute.mutedMembers.add(mutedMember);
-                muteId = set.getInt(1) + 1;
+                    "Primary Key(channelid));")) {
+                preparedStatement.executeUpdate();
             }
-            set.close();
-            preparedStatement.close();
+            try(Connection connection = dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("select * from Mutes where passed = ?")) {
+                preparedStatement.setBoolean(1, false);
+                ResultSet set = preparedStatement.executeQuery();
+                JDA jda = BotMain.getInstance().getJda();
+                Gson gson = new Gson();
+                while (set.next()) {
+                    Mute.MutedMember mutedMember = new Mute.MutedMember();
+                    mutedMember.sqid = set.getInt(1);
+                    mutedMember.member = jda.getGuilds().get(0).getMemberById(set.getLong(2));
+                    mutedMember.expires = set.getLong(3);
+                    mutedMember.muteType = Mute.MutedMember.MuteType.getMuteTypeByID(set.getInt(5));
+                    mutedMember.reason = set.getString(6);
+                    List<Long> rawTextChannels = gson.fromJson(set.getString(7), ArrayList.class);
+                    List<TextChannel> currentMuted = new ArrayList<>();
+                    for(long id : rawTextChannels) currentMuted.add(mutedMember.member.getGuild().getTextChannelById(id));
+                    mutedMember.currentMuted = currentMuted;
+                    Mute.mutedMembers.add(mutedMember);
+                    muteId = set.getInt(1) + 1;
+                }
+                set.close();
+            }
             managerScheduler.schedule(new TempBanListener(), 0, 60000);
             managerScheduler.schedule(new Mute.MuteTask(), 0, 1000);
             System.out.println("Database Manager ready !");
@@ -125,8 +121,7 @@ public class DatabaseManager {
     }
 
     public void uploadMute(Mute.MutedMember mutedMember) {
-        try {
-            PreparedStatement preparedStatement = dataSource.getConnection().prepareStatement("insert into `Mutes` values (?, ?, ?, ?, ?, ?, ?)");
+        try(Connection connection = dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("insert into `Mutes` values (?, ?, ?, ?, ?, ?, ?)");) {
             preparedStatement.setInt(1, muteId);
             preparedStatement.setLong(2, mutedMember.member.getIdLong());
             preparedStatement.setLong(3, mutedMember.expires);
@@ -138,7 +133,6 @@ public class DatabaseManager {
             for(TextChannel textChannel : mutedMember.currentMuted) channelIds.add(textChannel.getIdLong());
             preparedStatement.setString(7, new Gson().toJson(channelIds, ArrayList.class));
             preparedStatement.executeUpdate();
-            preparedStatement.close();
             mutedMember.sqid = muteId;
             muteId++;
         } catch (SQLException throwables) {
@@ -179,8 +173,7 @@ public class DatabaseManager {
 
         @Override
         public void run() {
-            try {
-                PreparedStatement preparedStatement = dataSource.getConnection().prepareStatement("select * from TempBans where passed = ?");
+            try(Connection connection = dataSource.getConnection();  PreparedStatement preparedStatement = connection.prepareStatement("select * from TempBans where passed = ?")) {
                 preparedStatement.setBoolean(1, false);
                 ResultSet set = preparedStatement.executeQuery();
                 while(set.next()) {
@@ -191,7 +184,6 @@ public class DatabaseManager {
                     }
                 }
                 set.close();
-                preparedStatement.close();
             } catch (SQLException throwables) {
                 throwables.printStackTrace();
             }
@@ -211,14 +203,12 @@ public class DatabaseManager {
         }
 
         public void createTableEntry() {
-            try {
-                PreparedStatement preparedStatement = dataSource.getConnection().prepareStatement("insert into TempBans values (?, ?, ?, ?)");
+            try(Connection connection = dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("insert into TempBans values (?, ?, ?, ?)")) {
                 preparedStatement.setInt(1, sqid);
                 preparedStatement.setLong(2, userid);
                 preparedStatement.setLong(3, expires);
                 preparedStatement.setBoolean(4, false);
                 preparedStatement.executeUpdate();
-                preparedStatement.close();
             } catch (SQLException throwables) {
                 throwables.printStackTrace();
             }
@@ -226,12 +216,10 @@ public class DatabaseManager {
         }
 
         public void purge() {
-            try {
-                PreparedStatement preparedStatement = dataSource.getConnection().prepareStatement("update TempBans set passed = ? where id = ?");
+            try(Connection connection = dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("update TempBans set passed = ? where id = ?");) {
                 preparedStatement.setBoolean(1, true);
                 preparedStatement.setInt(2, sqid);
                 preparedStatement.executeUpdate();
-                preparedStatement.close();
                 tempBans.remove(this);
             } catch (SQLException throwables) {
                 throwables.printStackTrace();
@@ -241,12 +229,7 @@ public class DatabaseManager {
     }
 
     public void close() {
-        try {
-            managerScheduler.cancel();
-            dataSource.getConnection().close();
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
-        }
+        managerScheduler.cancel();
     }
 
 }

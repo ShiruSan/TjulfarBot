@@ -11,6 +11,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -32,14 +33,12 @@ public class YoutubeManager {
             instance = new YoutubeManager();
             instance.gson = new Gson();
             instance.channelIDs = new ArrayList<>();
-            try {
-                PreparedStatement preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("select * from `Youtube`");
+            try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("select * from `Youtube`");) {
                 ResultSet set = preparedStatement.executeQuery();
                 while(set.next()) {
                     instance.channelIDs.add(set.getString(1));
                 }
                 set.close();
-                preparedStatement.close();
             } catch (SQLException throwables) {
                 throwables.printStackTrace();
             }
@@ -51,31 +50,30 @@ public class YoutubeManager {
     }
 
     public boolean addChannelID(String id) {
-        try {
-            PreparedStatement preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("insert into `Youtube` values (?, ?)");
+        boolean success = false;
+        try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("insert into `Youtube` values (?, ?)");) {
             preparedStatement.setString(1, id);
             preparedStatement.setString(2, getResponseItem(id).getSnippet().getTitle());
             preparedStatement.executeUpdate();
-            preparedStatement.close();
             channelIDs.add(id);
-            return true;
+            success = true;
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }
-        return false;
+        return success;
     }
 
     public boolean removeChannelID(String id) {
-        try {
-            PreparedStatement preparedStatement = BotMain.getInstance().getManager().dataSource.getConnection().prepareStatement("delete from `Youtube` where channelid = ?");
+        boolean success = false;
+        try(Connection connection = BotMain.getInstance().getManager().dataSource.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("delete from `Youtube` where channelid = ?");) {
             preparedStatement.setString(1, id);
             preparedStatement.executeUpdate();
-            preparedStatement.close();
             channelIDs.remove(id);
+            success = true;
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }
-        return false;
+        return success;
     }
 
     public Item getResponseItem(String channelid) {
@@ -118,6 +116,7 @@ public class YoutubeManager {
                 builder.setImage(video.getSnippet().getThumbnails().getHigh().getUrl().toString());
                 builder.setFooter(video.getSnippet().getPublishedAt().toString());
                 uploadChannel.sendMessage(uploadChannel.getGuild().getPublicRole().getAsMention()).embed(builder.build()).queue();
+                lastUploads.replace(channelId, video);
                 System.out.println("Sent Message and updated Video for " + video.getSnippet().getChannelTitle());
             }
         }

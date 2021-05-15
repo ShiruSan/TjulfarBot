@@ -11,6 +11,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -85,7 +86,7 @@ public class YoutubeManager {
             reader.close();
             SearchResponse searchResponse = gson.fromJson(json, SearchResponse.class);
             if(searchResponse.getItems()[0].getId().getKind().equals("youtube#video")) return searchResponse.getItems()[0];
-        } catch (IOException e) {
+        } catch (IOException | NullPointerException e) {
             e.printStackTrace();
         }
         return null;
@@ -96,28 +97,31 @@ public class YoutubeManager {
 
         @Override
         public void run() {
-            System.out.println("Fired ChannelScheduler");
             TextChannel uploadChannel = null;
             if(BotMain.getInstance().getSettings().videoUploadChannel != -1) uploadChannel = BotMain.getInstance().getJda().getTextChannelById(BotMain.getInstance().getSettings().videoUploadChannel);
             for(String channelId : instance.channelIDs) {
-                Item video = instance.getResponseItem(channelId);
+                Item item = instance.getResponseItem(channelId);
+                if(item == null) continue;
                 if(!lastUploads.containsKey(channelId)) {
-                    lastUploads.put(channelId, video);
-                    System.out.println("Added Video for " + video.getSnippet().getChannelTitle());
+                    lastUploads.put(channelId, item);
                     continue;
                 }
-                if(lastUploads.get(channelId).getId().getVideoId().equals(video.getId().getVideoId())) continue;
+                if(lastUploads.get(channelId).getId().getVideoId().equals(item.getId().getVideoId())) continue;
                 if(uploadChannel == null) break;
                 EmbedBuilder builder = new EmbedBuilder();
                 builder.setColor(Color.RED);
-                builder.setTitle("Neues Video von " + video.getSnippet().getChannelTitle());
-                builder.setDescription(video.getSnippet().getChannelTitle() + " hat ein neues Video hochgeladen !\n" + video.getAsVideoURL());
-                builder.addField(video.getSnippet().getTitle(), video.getSnippet().getDescription(), false);
-                builder.setImage(video.getSnippet().getThumbnails().getHigh().getUrl().toString());
-                builder.setFooter(video.getSnippet().getPublishedAt().toString());
+                if(item.getSnippet().getLiveBroadcastContent().equals("live")) {
+                    builder.setTitle(item.getSnippet().getChannelTitle() + " streamt nun !");
+                    builder.setDescription(item.getSnippet().getChannelTitle() + " streamt jetzt auf Youtube !\nSchau jetzt zu: " + item.getAsVideoURL());
+                } else {
+                    builder.setTitle("Neues Video von " + item.getSnippet().getChannelTitle());
+                    builder.setDescription(item.getSnippet().getChannelTitle() + " hat ein neues Video hochgeladen !\n" + item.getAsVideoURL());
+                }
+                builder.addField(item.getSnippet().getTitle(), item.getSnippet().getDescription(), false);
+                builder.setImage(item.getSnippet().getThumbnails().getHigh().getUrl().toString());
+                builder.setFooter(item.getSnippet().getPublishedAt().toString());
                 uploadChannel.sendMessage(uploadChannel.getGuild().getPublicRole().getAsMention()).embed(builder.build()).queue();
-                lastUploads.replace(channelId, video);
-                System.out.println("Sent Message and updated Video for " + video.getSnippet().getChannelTitle());
+                lastUploads.replace(channelId, item);
             }
         }
 

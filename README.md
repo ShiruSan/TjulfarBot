@@ -1,8 +1,8 @@
 # TjulfarBot
 
 This is the official repo of the TjulfarBot.<br>
-TjulfarBot is currently deprecated ! <br>
-Wait for the C# Rewrite TjulfarBot.Net
+TjulfarBot is deprecated ! <br>
+There is now a [new rewrite of the bot](https://github.com/ShiruSan/TjulfarBot.Net)
 <br>
 <br>
 <br>
